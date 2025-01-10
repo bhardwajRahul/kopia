@@ -49,6 +49,13 @@ func (v *Verifier) ShowStats(ctx context.Context) {
 	verifierLog(ctx).Infof("Processed %v objects.", processed)
 }
 
+// ShowFinalStats logs final verification statistics.
+func (v *Verifier) ShowFinalStats(ctx context.Context) {
+	processed := v.processed.Load()
+
+	verifierLog(ctx).Infof("Finished processing %v objects.", processed)
+}
+
 // VerifyFile verifies a single file object (using content check, blob map check or full read).
 func (v *Verifier) VerifyFile(ctx context.Context, oid object.ID, entryPath string) error {
 	verifierLog(ctx).Debugf("verifying object %v", oid)
@@ -69,8 +76,8 @@ func (v *Verifier) VerifyFile(ctx context.Context, oid object.ID, entryPath stri
 				return errors.Wrapf(err, "error verifying content %v", cid)
 			}
 
-			if _, ok := v.blobMap[ci.GetPackBlobID()]; !ok {
-				return errors.Errorf("object %v is backed by missing blob %v", oid, ci.GetPackBlobID())
+			if _, ok := v.blobMap[ci.PackBlobID]; !ok {
+				return errors.Errorf("object %v is backed by missing blob %v", oid, ci.PackBlobID)
 			}
 		}
 	}
@@ -139,7 +146,7 @@ func (v *Verifier) InParallel(ctx context.Context, enqueue func(tw *TreeWalker) 
 
 	v.fileWorkQueue = make(chan verifyFileWorkItem, v.opts.FileQueueLength)
 
-	for i := 0; i < v.opts.Parallelism; i++ {
+	for range v.opts.Parallelism {
 		v.workersWG.Add(1)
 
 		go func() {

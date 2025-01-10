@@ -21,7 +21,7 @@ import (
 const configDirMode = 0o700
 
 // ErrCannotWriteToRepoConnectionWithPermissiveCacheLoading error to indicate.
-var ErrCannotWriteToRepoConnectionWithPermissiveCacheLoading = errors.Errorf("cannot write to repo connection with permissive cache loading")
+var ErrCannotWriteToRepoConnectionWithPermissiveCacheLoading = errors.New("cannot write to repo connection with permissive cache loading")
 
 // ClientOptions contains client-specific options that are persisted in local configuration file.
 type ClientOptions struct {
@@ -133,7 +133,7 @@ func LoadConfigFromFile(fileName string) (*LocalConfig, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading config file")
 	}
-	defer f.Close() //nolint:errcheck,gosec
+	defer f.Close() //nolint:errcheck
 
 	var lc LocalConfig
 

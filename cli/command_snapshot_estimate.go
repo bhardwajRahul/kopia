@@ -60,6 +60,8 @@ func (ep *estimateProgress) Error(ctx context.Context, filename string, err erro
 }
 
 func (ep *estimateProgress) Stats(ctx context.Context, st *snapshot.Stats, included, excluded snapshotfs.SampleBuckets, excludedDirs []string, final bool) {
+	_ = final
+
 	ep.stats = *st
 	ep.included = included
 	ep.excluded = excluded
@@ -126,7 +128,7 @@ func (c *commandSnapshotEstimate) run(ctx context.Context, rep repo.Repository) 
 		c.out.printStdout("Encountered %v error(s).\n", ep.stats.ErrorCount)
 	}
 
-	megabits := float64(ep.stats.TotalFileSize) * 8 / 1000000 //nolint:gomnd
+	megabits := float64(ep.stats.TotalFileSize) * 8 / 1000000 //nolint:mnd
 	seconds := megabits / c.snapshotEstimateUploadSpeed
 
 	c.out.printStdout("\n")

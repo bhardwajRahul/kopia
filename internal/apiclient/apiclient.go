@@ -5,9 +5,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
+	net_url "net/url"
 	"regexp"
 	"strings"
 
@@ -70,7 +73,7 @@ func (c *KopiaAPIClient) FetchCSRFTokenForTesting(ctx context.Context) error {
 
 	match := re.FindSubmatch(b)
 	if match == nil {
-		return errors.Errorf("CSRF token not found")
+		return errors.New("CSRF token not found")
 	}
 
 	c.CSRFToken = string(match[1])
@@ -146,9 +149,30 @@ func (e HTTPStatusError) Error() string {
 	return e.ErrorMessage
 }
 
+// serverErrorResponse is a structure that can decode the Error field
+// of a serverapi.ErrorResponse received from the API server.
+type serverErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// respToErrorMessage will attempt to JSON decode the response body into
+// a structure resembling the serverapi.ErrorResponse struct. If successful,
+// the Error field will be included in the string output. Otherwise
+// only the response Status field will be returned.
+func respToErrorMessage(resp *http.Response) string {
+	errResp := serverErrorResponse{}
+
+	err := json.NewDecoder(resp.Body).Decode(&errResp)
+	if err != nil {
+		return resp.Status
+	}
+
+	return fmt.Sprintf("%s: %s", resp.Status, errResp.Error)
+}
+
 func decodeResponse(resp *http.Response, respPayload interface{}) error {
 	if resp.StatusCode != http.StatusOK {
-		return HTTPStatusError{resp.StatusCode, resp.Status}
+		return HTTPStatusError{resp.StatusCode, respToErrorMessage(resp)}
 	}
 
 	if respPayload == nil {
@@ -192,6 +216,20 @@ func NewKopiaAPIClient(options Options) (*KopiaAPIClient, error) {
 		transport = http.DefaultTransport
 	}
 
+	uri := options.BaseURL
+
+	if strings.HasPrefix(options.BaseURL, "unix+https://") || strings.HasPrefix(options.BaseURL, "unix+http://") {
+		u, _ := net_url.Parse(strings.TrimPrefix(options.BaseURL, "unix+"))
+		uri = u.Scheme + "://localhost"
+		tp, _ := transport.(*http.Transport)
+		transport = tp.Clone()
+		tp, _ = transport.(*http.Transport)
+		tp.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
+			dial, err := net.Dial("unix", u.Path)
+			return dial, errors.Wrap(err, "Failed to conect to socket: "+options.BaseURL)
+		}
+	}
+
 	// wrap with a round-tripper that provides basic authentication
 	if options.Username != "" || options.Password != "" {
 		transport = basicAuthTransport{transport, options.Username, options.Password}
@@ -207,7 +245,7 @@ func NewKopiaAPIClient(options Options) (*KopiaAPIClient, error) {
 	}
 
 	return &KopiaAPIClient{
-		options.BaseURL,
+		uri,
 		&http.Client{
 			Jar:       cj,
 			Transport: transport,

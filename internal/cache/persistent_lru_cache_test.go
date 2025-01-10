@@ -25,7 +25,7 @@ func TestPersistentLRUCache(t *testing.T) {
 
 	const maxSizeBytes = 1000
 
-	cs := blobtesting.NewMapStorage(blobtesting.DataMap{}, nil, nil).(cache.Storage)
+	cs := blobtesting.NewMapStorageWithLimit(blobtesting.DataMap{}, nil, nil, maxSizeBytes).(cache.Storage)
 
 	pc, err := cache.NewPersistentCache(ctx, "testing", cs, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{
 		MaxSizeBytes:   maxSizeBytes,
@@ -87,7 +87,7 @@ func TestPersistentLRUCache(t *testing.T) {
 	}, nil, clock.Now)
 	require.NoError(t, err)
 
-	someError := errors.Errorf("some error")
+	someError := errors.New("some error")
 
 	var tmp2 gather.WriteBuffer
 	defer tmp2.Close()
@@ -126,7 +126,7 @@ func TestPersistentLRUCache_Invalid(t *testing.T) {
 
 	ctx := testlogging.ContextWithLevel(t, testlogging.LevelInfo)
 
-	someError := errors.Errorf("some error")
+	someError := errors.New("some error")
 
 	st := blobtesting.NewMapStorage(blobtesting.DataMap{}, nil, nil)
 	fs := blobtesting.NewFaultyStorage(st)
@@ -144,15 +144,17 @@ func TestPersistentLRUCache_GetDeletesInvalidBlob(t *testing.T) {
 
 	ctx := testlogging.ContextWithLevel(t, testlogging.LevelInfo)
 
-	someError := errors.Errorf("some error")
+	someError := errors.New("some error")
 
 	data := blobtesting.DataMap{}
 
-	st := blobtesting.NewMapStorage(data, nil, nil)
+	const maxSizeBytes = 1000
+
+	st := blobtesting.NewMapStorageWithLimit(data, nil, nil, maxSizeBytes)
 	fs := blobtesting.NewFaultyStorage(st)
 	fc := faultyCache{fs}
 
-	pc, err := cache.NewPersistentCache(ctx, "test", fc, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{MaxSizeBytes: 100}, nil, clock.Now)
+	pc, err := cache.NewPersistentCache(ctx, "test", fc, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{MaxSizeBytes: maxSizeBytes}, nil, clock.Now)
 	require.NoError(t, err)
 
 	pc.Put(ctx, "key", gather.FromSlice([]byte{1, 2, 3}))
@@ -174,7 +176,7 @@ func TestPersistentLRUCache_PutIgnoresStorageFailure(t *testing.T) {
 
 	ctx := testlogging.ContextWithLevel(t, testlogging.LevelInfo)
 
-	someError := errors.Errorf("some error")
+	someError := errors.New("some error")
 
 	data := blobtesting.DataMap{}
 
@@ -194,7 +196,7 @@ func TestPersistentLRUCache_PutIgnoresStorageFailure(t *testing.T) {
 
 	require.False(t, pc.GetFull(ctx, "key", &tmp))
 
-	require.Equal(t, fs.NumCalls(blobtesting.MethodPutBlob), 1)
+	require.Equal(t, 1, fs.NumCalls(blobtesting.MethodPutBlob))
 }
 
 func TestPersistentLRUCache_SweepMinSweepAge(t *testing.T) {
@@ -204,21 +206,23 @@ func TestPersistentLRUCache_SweepMinSweepAge(t *testing.T) {
 
 	data := blobtesting.DataMap{}
 
-	st := blobtesting.NewMapStorage(data, nil, nil)
+	const maxSizeBytes = 1000
+
+	st := blobtesting.NewMapStorageWithLimit(data, nil, nil, maxSizeBytes)
 	fs := blobtesting.NewFaultyStorage(st)
 	fc := faultyCache{fs}
 
 	pc, err := cache.NewPersistentCache(ctx, "test", fc, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{
-		MaxSizeBytes: 1000,
+		MaxSizeBytes: maxSizeBytes,
 		MinSweepAge:  10 * time.Second,
 	}, nil, clock.Now)
 	require.NoError(t, err)
 	pc.Put(ctx, "key", gather.FromSlice([]byte{1, 2, 3}))
-	pc.Put(ctx, "key2", gather.FromSlice(bytes.Repeat([]byte{1, 2, 3}, 1e6)))
+	pc.Put(ctx, "key2", gather.FromSlice(bytes.Repeat([]byte{1, 2, 3}, 10)))
 	time.Sleep(1 * time.Second)
 
 	// simulate error during final sweep
-	fs.AddFault(blobtesting.MethodListBlobs).ErrorInstead(errors.Errorf("some error"))
+	fs.AddFault(blobtesting.MethodListBlobs).ErrorInstead(errors.New("some error"))
 	pc.Close(ctx)
 
 	// both keys are retained since we're under min sweep age
@@ -232,24 +236,26 @@ func TestPersistentLRUCache_SweepIgnoresErrors(t *testing.T) {
 
 	data := blobtesting.DataMap{}
 
-	st := blobtesting.NewMapStorage(data, nil, nil)
+	const maxSizeBytes = 1000
+
+	st := blobtesting.NewMapStorageWithLimit(data, nil, nil, maxSizeBytes)
 	fs := blobtesting.NewFaultyStorage(st)
 	fc := faultyCache{fs}
 
 	pc, err := cache.NewPersistentCache(ctx, "test", fc, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{
-		MaxSizeBytes: 1000,
+		MaxSizeBytes: maxSizeBytes,
 	}, nil, clock.Now)
 	require.NoError(t, err)
 
 	// ignore delete errors forever
-	fs.AddFault(blobtesting.MethodDeleteBlob).ErrorInstead(errors.Errorf("some delete error")).Repeat(1e6)
+	fs.AddFault(blobtesting.MethodDeleteBlob).ErrorInstead(errors.New("some delete error")).Repeat(1e6)
 
 	pc.Put(ctx, "key", gather.FromSlice([]byte{1, 2, 3}))
-	pc.Put(ctx, "key2", gather.FromSlice(bytes.Repeat([]byte{1, 2, 3}, 1e6)))
+	pc.Put(ctx, "key2", gather.FromSlice(bytes.Repeat([]byte{1, 2, 3}, 10)))
 	time.Sleep(500 * time.Millisecond)
 
 	// simulate error during sweep
-	fs.AddFaults(blobtesting.MethodListBlobs, fault.New().ErrorInstead(errors.Errorf("some error")))
+	fs.AddFaults(blobtesting.MethodListBlobs, fault.New().ErrorInstead(errors.New("some error")))
 
 	time.Sleep(500 * time.Millisecond)
 
@@ -264,12 +270,14 @@ func TestPersistentLRUCache_Sweep1(t *testing.T) {
 
 	data := blobtesting.DataMap{}
 
-	st := blobtesting.NewMapStorage(data, nil, nil)
+	const maxSizeBytes = 1
+
+	st := blobtesting.NewMapStorageWithLimit(data, nil, nil, maxSizeBytes)
 	fs := blobtesting.NewFaultyStorage(st)
 	fc := faultyCache{fs}
 
 	pc, err := cache.NewPersistentCache(ctx, "test", fc, cacheprot.ChecksumProtection([]byte{1, 2, 3}), cache.SweepSettings{
-		MaxSizeBytes: 1,
+		MaxSizeBytes: maxSizeBytes,
 		MinSweepAge:  0 * time.Second,
 	}, nil, clock.Now)
 	require.NoError(t, err)
@@ -278,7 +286,7 @@ func TestPersistentLRUCache_Sweep1(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// simulate error during final sweep
-	fs.AddFaults(blobtesting.MethodListBlobs, fault.New().ErrorInstead(errors.Errorf("some error")))
+	fs.AddFaults(blobtesting.MethodListBlobs, fault.New().ErrorInstead(errors.New("some error")))
 	pc.Close(ctx)
 }
 
@@ -291,20 +299,13 @@ func TestPersistentLRUCacheNil(t *testing.T) {
 	pc.Close(ctx)
 	pc.Put(ctx, "key", gather.FromSlice([]byte{1, 2, 3}))
 
-	m1 := pc.GetFetchingMutex("dummy")
-	m2 := pc.GetFetchingMutex("dummy")
-
-	require.NotNil(t, m1)
-	require.NotNil(t, m2)
-	require.NotSame(t, m1, m2)
-
 	var tmp gather.WriteBuffer
 
 	require.False(t, pc.GetFull(ctx, "key", &tmp))
 
 	called := false
 
-	dummyError := errors.Errorf("dummy error")
+	dummyError := errors.New("dummy error")
 
 	require.ErrorIs(t, pc.GetOrLoad(ctx, "key", func(output *gather.WriteBuffer) error {
 		called = true

@@ -10,8 +10,6 @@ import (
 
 // RepositoryConfig describes the format of objects in a repository.
 // The contents of this object are stored encrypted since they contain sensitive key material.
-//
-//nolint:musttag // false positive
 type RepositoryConfig struct {
 	ContentFormat
 	ObjectFormat
@@ -31,7 +29,7 @@ func (f *KopiaRepositoryJSON) decryptRepositoryConfig(masterKey []byte) (*Reposi
 	case aes256GcmEncryption:
 		plainText, err := decryptRepositoryBlobBytesAes256Gcm(f.EncryptedFormatBytes, masterKey, f.UniqueID)
 		if err != nil {
-			return nil, errors.Errorf("unable to decrypt repository format")
+			return nil, errors.New("unable to decrypt repository format")
 		}
 
 		var erc EncryptedRepositoryConfig

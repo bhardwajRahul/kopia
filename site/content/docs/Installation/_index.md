@@ -1,7 +1,7 @@
 ---
 title: "Download & Installation"
 linkTitle: "Installation Guide"
-weight: 35
+weight: 20
 ---
 
 ## Two Variants of Kopia
@@ -48,7 +48,7 @@ The following options are available if you like to test the beta and unreleased 
 
 CLI and GUI packages are available for:
 
-* Windows 7 or later, 64-bit (CLI binary, GUI installer {`KopiaUI`}, and Scoop package)
+* Windows 10 or later, 64-bit (CLI binary, GUI installer {`KopiaUI`}, and Scoop package)
 * macOS 10.11 or later, 64-bit (CLI binary, GUI installer {`KopiaUI`}, and Homebrew package)
 * Linux - `amd64`, `armhf` or `arm64` (CLI binary and `KopiaUI` available via RPM and DEB repositories)
 
@@ -124,13 +124,13 @@ Kopia offers APT repository compatible with Debian, Ubuntu and other similar dis
 To begin, install the GPG signing key to verify authenticity of the releases.
 
 ```shell
-curl -s https://kopia.io/signing-key | sudo gpg --dearmor -o /usr/share/keyrings/kopia-keyring.gpg
+curl -s https://kopia.io/signing-key | sudo gpg --dearmor -o /etc/apt/keyrings/kopia-keyring.gpg
 ```
 
 Register APT source:
 
 ```shell
-echo "deb [signed-by=/usr/share/keyrings/kopia-keyring.gpg] http://packages.kopia.io/apt/ stable main" | sudo tee /etc/apt/sources.list.d/kopia.list
+echo "deb [signed-by=/etc/apt/keyrings/kopia-keyring.gpg] http://packages.kopia.io/apt/ stable main" | sudo tee /etc/apt/sources.list.d/kopia.list
 sudo apt update
 ```
 
@@ -209,7 +209,7 @@ yay -S kopia-bin
 
 ### OpenBSD installation via ports
 
-OpenBSD now has kopia in -current ports, which means it gets built as packages in snapshots for several platforms (amd64, arm64, mips64 and i386) and will appear as a package for OpenBSD 7.1 and later releases.
+OpenBSD has kopia in ports, which means it gets built as packages in snapshots for several platforms (amd64, arm64, mips64 and i386).
 
 To install the kopia package, run:
 

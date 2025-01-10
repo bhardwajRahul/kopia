@@ -25,7 +25,7 @@ func handleSourcesList(ctx context.Context, rc requestContext) (interface{}, *ap
 		MultiUser:     multiUser,
 	}
 
-	for src, v := range rc.srv.allSourceManagers() {
+	for src, v := range rc.srv.snapshotAllSourceManagers() {
 		if sourceMatchesURLFilter(src, rc.req.URL.Query()) {
 			resp.Sources = append(resp.Sources, v.Status())
 		}
@@ -75,7 +75,6 @@ func handleSourcesCreate(ctx context.Context, rc requestContext) (interface{}, *
 	if err = repo.WriteSession(ctx, rc.rep, repo.WriteSessionOptions{
 		Purpose: "handleSourcesCreate",
 	}, func(ctx context.Context, w repo.RepositoryWriter) error {
-		//nolint:wrapcheck
 		return policy.SetPolicy(ctx, w, sourceInfo, req.Policy)
 	}); err != nil {
 		return nil, internalServerError(errors.Wrap(err, "unable to set initial policy"))

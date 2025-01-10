@@ -102,13 +102,13 @@ retry:=
 endif
 
 # tool versions
-GOLANGCI_LINT_VERSION=1.51.1
-CHECKLOCKS_VERSION=release-20221026.0
-NODE_VERSION=16.13.0
-HUGO_VERSION=0.89.2
-GOTESTSUM_VERSION=1.7.0
+GOLANGCI_LINT_VERSION=1.62.0
+CHECKLOCKS_VERSION=e8c1fff214d0ecf02cfe5aa9c62d11174130c339
+NODE_VERSION=20.15.1
+HUGO_VERSION=0.113.0
+GOTESTSUM_VERSION=1.11.0
 GORELEASER_VERSION=v0.176.0
-RCLONE_VERSION=1.62.2
+RCLONE_VERSION=1.68.2
 GITCHGLOG_VERSION=0.15.1
 
 # nodejs / npm
@@ -120,6 +120,11 @@ node_dir=$(node_base_dir)$(slash)bin
 endif
 npm=$(node_dir)$(slash)npm$(cmd_suffix)
 npm_flags=--scripts-prepend-node-path=auto
+
+npm_install_or_ci:=install
+ifneq ($(CI),)
+npm_install_or_ci:=ci
+endif
 
 # put NPM in the path
 PATH:=$(node_dir)$(path_separator)$(PATH)
@@ -159,6 +164,12 @@ $(checklocks):
 	go install gvisor.dev/gvisor/tools/checklocks/cmd/checklocks@$(CHECKLOCKS_VERSION)
 	go clean -modcache
 
+# cli2md
+cli2mdbin=$(TOOLS_DIR)$(slash)cli2md-current$(exe_suffix)
+
+$(cli2mdbin):
+	go build -o $(cli2mdbin) github.com/kopia/kopia/tools/cli2md
+
 # hugo
 hugo_dir=$(TOOLS_DIR)$(slash)hugo-$(HUGO_VERSION)
 hugo=$(hugo_dir)/hugo$(exe_suffix)
@@ -194,6 +205,13 @@ kopia08=$(kopia08_dir)$(slash)kopia$(exe_suffix)
 
 $(kopia08):
 	go run github.com/kopia/kopia/tools/gettool --tool kopia:$(kopia08_version) --output-dir $(kopia08_dir)
+
+kopia017_version=0.17.0
+kopia017_dir=$(TOOLS_DIR)$(slash)kopia-$(kopia017_version)
+kopia017=$(kopia017_dir)$(slash)kopia$(exe_suffix)
+
+$(kopia017):
+	go run github.com/kopia/kopia/tools/gettool --tool kopia:$(kopia017_version) --output-dir $(kopia017_dir)
 
 MINIO_MC_PATH=$(TOOLS_DIR)/bin/mc$(exe_suffix)
 
@@ -289,7 +307,7 @@ else
 maybehugo=
 endif
 
-ALL_TOOL_VERSIONS=node:$(NODE_VERSION),linter:$(GOLANGCI_LINT_VERSION),hugo:$(HUGO_VERSION),rclone:$(RCLONE_VERSION),gotestsum:$(GOTESTSUM_VERSION),goreleaser:$(GORELEASER_VERSION),kopia:0.8.4,gitchglog:$(GITCHGLOG_VERSION)
+ALL_TOOL_VERSIONS=node:$(NODE_VERSION),linter:$(GOLANGCI_LINT_VERSION),hugo:$(HUGO_VERSION),rclone:$(RCLONE_VERSION),gotestsum:$(GOTESTSUM_VERSION),goreleaser:$(GORELEASER_VERSION),kopia:0.8.4,kopia:0.17.0,gitchglog:$(GITCHGLOG_VERSION)
 
 verify-all-tool-checksums:
 	go run github.com/kopia/kopia/tools/gettool --test-all \
@@ -297,9 +315,8 @@ verify-all-tool-checksums:
 	  --tool $(ALL_TOOL_VERSIONS)
 
 regenerate-checksums:
-	go run github.com/kopia/kopia/tools/gettool --regenerate-checksums \
+	go run github.com/kopia/kopia/tools/gettool --regenerate-checksums $(CURDIR)/tools/gettool/checksums.txt \
 	  --output-dir /tmp/all-tools \
 	  --tool $(ALL_TOOL_VERSIONS)
 
 all-tools: $(gotestsum) $(npm) $(linter) $(maybehugo)
-
