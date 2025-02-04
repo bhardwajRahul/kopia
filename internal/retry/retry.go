@@ -55,7 +55,7 @@ func PeriodicallyNoValue(ctx context.Context, interval time.Duration, count int,
 // internalRetry runs the provided attempt until it succeeds, retrying on all errors that are
 // deemed retriable by the provided function. The delay between retries grows exponentially up to
 // a certain limit.
-func internalRetry[T any](ctx context.Context, desc string, attempt func() (T, error), isRetriableError IsRetriableFunc, initial, max time.Duration, count int, factor float64) (T, error) {
+func internalRetry[T any](ctx context.Context, desc string, attempt func() (T, error), isRetriableError IsRetriableFunc, initial, maxSleep time.Duration, count int, factor float64) (T, error) {
 	sleepAmount := initial
 
 	var (
@@ -86,8 +86,8 @@ func internalRetry[T any](ctx context.Context, desc string, attempt func() (T, e
 		time.Sleep(sleepAmount)
 		sleepAmount = time.Duration(float64(sleepAmount) * factor)
 
-		if sleepAmount > max {
-			sleepAmount = max
+		if sleepAmount > maxSleep {
+			sleepAmount = maxSleep
 		}
 	}
 
@@ -105,11 +105,11 @@ func WithExponentialBackoffNoValue(ctx context.Context, desc string, attempt fun
 }
 
 // Always is a retry function that retries all errors.
-func Always(err error) bool {
+func Always(error) bool {
 	return true
 }
 
 // Never is a retry function that never retries.
-func Never(err error) bool {
+func Never(error) bool {
 	return false
 }

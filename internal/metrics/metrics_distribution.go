@@ -20,6 +20,10 @@ type DistributionState[T constraints.Float | constraints.Integer] struct {
 }
 
 func (s *DistributionState[T]) mergeFrom(other *DistributionState[T]) {
+	s.mergeScaledFrom(other, 1)
+}
+
+func (s *DistributionState[T]) mergeScaledFrom(other *DistributionState[T], scale float64) {
 	if s.Count == 0 {
 		s.Min = other.Min
 		s.Max = other.Max
@@ -46,7 +50,7 @@ func (s *DistributionState[T]) mergeFrom(other *DistributionState[T]) {
 
 	if len(s.BucketCounters) == len(other.BucketCounters) {
 		for i, v := range other.BucketCounters {
-			s.BucketCounters[i] += v
+			s.BucketCounters[i] += int64(float64(v) * scale)
 		}
 	}
 }
@@ -63,8 +67,8 @@ func (s *DistributionState[T]) Mean() T {
 // Distribution measures distribution/summary of values.
 type Distribution[T constraints.Integer | constraints.Float] struct {
 	mu               sync.Mutex
-	state            atomic.Pointer[DistributionState[T]]
-	bucketThresholds []T
+	state            atomic.Pointer[DistributionState[T]] // +checklocksignore
+	bucketThresholds []T                                  // +checklocksignore
 
 	prom            prometheus.Observer
 	prometheusScale float64

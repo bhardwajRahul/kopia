@@ -34,8 +34,6 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 	// First verify that blocks don't exist.
 	t.Run("VerifyBlobsNotFound", func(t *testing.T) {
 		for _, b := range blocks {
-			b := b
-
 			t.Run(string(b.blk), func(t *testing.T) {
 				t.Parallel()
 
@@ -57,15 +55,11 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 	// Now add blocks.
 	t.Run("AddBlobs", func(t *testing.T) {
 		for _, b := range blocks {
-			for i := 0; i < initialAddConcurrency; i++ {
-				b := b
-
+			for i := range initialAddConcurrency {
 				t.Run(fmt.Sprintf("%v-%v", b.blk, i), func(t *testing.T) {
 					t.Parallel()
 
-					if err := r.PutBlob(ctx, b.blk, gather.FromSlice(b.contents), opts); err != nil {
-						t.Fatalf("can't put blob: %v", err)
-					}
+					require.NoError(t, r.PutBlob(ctx, b.blk, gather.FromSlice(b.contents), opts))
 				})
 			}
 		}
@@ -73,8 +67,6 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 
 	t.Run("GetBlobs", func(t *testing.T) {
 		for _, b := range blocks {
-			b := b
-
 			t.Run(string(b.blk), func(t *testing.T) {
 				t.Parallel()
 
@@ -112,8 +104,6 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 		newContents := []byte{99}
 
 		for _, b := range blocks {
-			b := b
-
 			t.Run(string(b.blk), func(t *testing.T) {
 				t.Parallel()
 				err := r.PutBlob(ctx, b.blk, gather.FromSlice(newContents), opts)
@@ -128,6 +118,18 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 		}
 	})
 
+	t.Run("ExtendBlobRetention", func(t *testing.T) {
+		err := r.ExtendBlobRetention(ctx, blocks[0].blk, blob.ExtendOptions{
+			RetentionMode:   opts.RetentionMode,
+			RetentionPeriod: opts.RetentionPeriod,
+		})
+		if opts.RetentionMode != "" && err != nil {
+			t.Fatalf("No error expected during extend retention: %v", err)
+		} else if opts.RetentionMode == "" && err == nil {
+			t.Fatal("No error found when expected during extend retention")
+		}
+	})
+
 	t.Run("DeleteBlobsAndList", func(t *testing.T) {
 		require.NoError(t, r.DeleteBlob(ctx, blocks[0].blk))
 		require.NoError(t, r.DeleteBlob(ctx, blocks[0].blk))
@@ -138,8 +140,6 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 
 	t.Run("PutBlobsWithSetTime", func(t *testing.T) {
 		for _, b := range blocks {
-			b := b
-
 			t.Run(string(b.blk), func(t *testing.T) {
 				t.Parallel()
 
@@ -169,8 +169,6 @@ func VerifyStorage(ctx context.Context, t *testing.T, r blob.Storage, opts blob.
 
 	t.Run("PutBlobsWithGetTime", func(t *testing.T) {
 		for _, b := range blocks {
-			b := b
-
 			t.Run(string(b.blk), func(t *testing.T) {
 				t.Parallel()
 
@@ -217,13 +215,14 @@ func AssertConnectionInfoRoundTrips(ctx context.Context, t *testing.T, s blob.St
 
 // TestValidationOptions is the set of options used when running providing validation from tests.
 //
-//nolint:gomnd
+//nolint:mnd
 var TestValidationOptions = providervalidation.Options{
-	MaxClockDrift:           3 * time.Minute,
-	ConcurrencyTestDuration: 15 * time.Second,
-	NumPutBlobWorkers:       3,
-	NumGetBlobWorkers:       3,
-	NumGetMetadataWorkers:   3,
-	NumListBlobsWorkers:     3,
-	MaxBlobLength:           10e6,
+	MaxClockDrift:                   3 * time.Minute,
+	ConcurrencyTestDuration:         15 * time.Second,
+	NumEquivalentStorageConnections: 5,
+	NumPutBlobWorkers:               3,
+	NumGetBlobWorkers:               3,
+	NumGetMetadataWorkers:           3,
+	NumListBlobsWorkers:             3,
+	MaxBlobLength:                   10e6,
 }

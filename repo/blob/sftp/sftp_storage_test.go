@@ -151,6 +151,7 @@ func startDockerSFTPServerOrSkip(t *testing.T, idRSA string) (host string, port 
 
 		t.Logf("SFTP server OK on host:%q port:%v. Known hosts file: %v", host, port, knownHostsFile)
 
+		//nolint:nakedret
 		return
 	}
 
@@ -172,7 +173,6 @@ func TestSFTPStorageValid(t *testing.T) {
 	host, port, knownHostsFile := startDockerSFTPServerOrSkip(t, idRSA)
 
 	for _, embedCreds := range []bool{false, true} {
-		embedCreds := embedCreds
 		t.Run(fmt.Sprintf("Embed=%v", embedCreds), func(t *testing.T) {
 			ctx := testlogging.Context(t)
 

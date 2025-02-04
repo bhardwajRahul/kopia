@@ -21,7 +21,7 @@ const (
 
 // ErrFormatUptoDate is returned whenever a lock intent is attempted to be set
 // on a repository that is already using the latest format version.
-var ErrFormatUptoDate = errors.New("repository format is up to date")
+var ErrFormatUptoDate = errors.New("repository format is up to date") // +checklocksignore
 
 // BackupBlobID gets the upgrade backu pblob-id fro mthe lock.
 func BackupBlobID(l UpgradeLockIntent) blob.ID {
@@ -37,7 +37,7 @@ func BackupBlobID(l UpgradeLockIntent) blob.ID {
 // should cause the unsupporting clients (non-upgrade capable) to fail
 // connecting to the repository.
 func (m *Manager) SetUpgradeLockIntent(ctx context.Context, l UpgradeLockIntent) (*UpgradeLockIntent, error) {
-	if err := m.maybeRefreshNotLocked(); err != nil {
+	if err := m.maybeRefreshNotLocked(ctx); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +96,7 @@ func WriteLegacyIndexPoisonBlob(ctx context.Context, st blob.Storage) error {
 // blob. This in-effect commits the new repository format to the repository and
 // resumes all access to the repository.
 func (m *Manager) CommitUpgrade(ctx context.Context) error {
-	if err := m.maybeRefreshNotLocked(); err != nil {
+	if err := m.maybeRefreshNotLocked(ctx); err != nil {
 		return err
 	}
 
@@ -125,7 +125,7 @@ func (m *Manager) CommitUpgrade(ctx context.Context) error {
 // hence using this API could render the repository corrupted and unreadable by
 // clients.
 func (m *Manager) RollbackUpgrade(ctx context.Context) error {
-	if err := m.maybeRefreshNotLocked(); err != nil {
+	if err := m.maybeRefreshNotLocked(ctx); err != nil {
 		return err
 	}
 
@@ -187,7 +187,7 @@ func (m *Manager) RollbackUpgrade(ctx context.Context) error {
 
 // GetUpgradeLockIntent gets the current upgrade lock intent.
 func (m *Manager) GetUpgradeLockIntent(ctx context.Context) (*UpgradeLockIntent, error) {
-	if err := m.maybeRefreshNotLocked(); err != nil {
+	if err := m.maybeRefreshNotLocked(ctx); err != nil {
 		return nil, err
 	}
 

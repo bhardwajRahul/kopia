@@ -16,7 +16,9 @@ const (
 //nolint:gochecknoglobals
 var (
 	promCacheMutex sync.Mutex
-	promCounters   = map[string]*prometheus.CounterVec{}
+	// +checklocks:promCacheMutex
+	promCounters = map[string]*prometheus.CounterVec{}
+	// +checklocks:promCacheMutex
 	promHistograms = map[string]*prometheus.HistogramVec{}
 )
 
@@ -34,7 +36,7 @@ func getPrometheusCounter(opts prometheus.CounterOpts, labels map[string]string)
 	return prom.WithLabelValues(maps.Values(labels)...)
 }
 
-func getPrometheusHistogram(opts prometheus.HistogramOpts, labels map[string]string) prometheus.Observer {
+func getPrometheusHistogram(opts prometheus.HistogramOpts, labels map[string]string) prometheus.Observer { //nolint:gocritic
 	promCacheMutex.Lock()
 	defer promCacheMutex.Unlock()
 
