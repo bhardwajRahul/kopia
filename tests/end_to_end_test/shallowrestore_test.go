@@ -700,7 +700,7 @@ func (rdc *repoDirEntryCache) getRepoDirEntry(t *testing.T, rop string) *snapsho
 	return nil
 }
 
-// validateXattr checks that shallowrestore absolute path srp has placeholder
+// validatePlaceholder checks that shallowrestore absolute path srp has placeholder
 // DirEntry value equal to the in-repository DirEntry for rootid/rop.
 func (rdc *repoDirEntryCache) validatePlaceholder(t *testing.T, rop, srp string) {
 	t.Helper()
@@ -791,7 +791,7 @@ func getShallowInfo(t *testing.T, srp string) (string, os.FileInfo) {
 
 	v := -1
 
-	for i, s := range []string{"", localfs.ShallowEntrySuffix, dIRPH} { // nolint(wsl)
+	for i, s := range []string{"", localfs.ShallowEntrySuffix, dIRPH} {
 		paths[i] = srp + s
 		shallowinfos[i], errors[i] = os.Lstat(paths[i])
 
@@ -804,7 +804,7 @@ func getShallowInfo(t *testing.T, srp string) (string, os.FileInfo) {
 	// the file paths should exist.)
 	errcount := 0
 
-	for _, e := range errors { // nolint(wsl)
+	for _, e := range errors {
 		if e != nil {
 			errcount++
 		}
@@ -946,7 +946,7 @@ func verifyShallowVsOriginalFile(t *testing.T, rdc *repoDirEntryCache, shallow, 
 func makeLongName(c rune) string {
 	// TODO(rjk): not likely to work on plan9.
 	buffy := make([]byte, 0, restore.MaxFilenameLength)
-	for i := 0; i < restore.MaxFilenameLength; i++ {
+	for range restore.MaxFilenameLength {
 		buffy = append(buffy, byte(c))
 	}
 

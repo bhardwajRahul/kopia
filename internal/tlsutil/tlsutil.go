@@ -33,7 +33,7 @@ var log = logging.Module("tls")
 
 // GenerateServerCertificate generates random TLS certificate and key.
 func GenerateServerCertificate(ctx context.Context, keySize int, certValid time.Duration, names []string) (*x509.Certificate, *rsa.PrivateKey, error) {
-	log(ctx).Debugf("generating new TLS certificate")
+	log(ctx).Debug("generating new TLS certificate")
 
 	priv, err := rsa.GenerateKey(rand.Reader, keySize)
 	if err != nil {
@@ -43,7 +43,7 @@ func GenerateServerCertificate(ctx context.Context, keySize int, certValid time.
 	notBefore := clock.Now()
 	notAfter := notBefore.Add(certValid)
 
-	//nolint:gomnd
+	//nolint:mnd
 	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to generate serial number")
@@ -91,7 +91,7 @@ func WritePrivateKeyToFile(fname string, priv *rsa.PrivateKey) error {
 	if err != nil {
 		return errors.Wrap(err, "error opening private key file")
 	}
-	defer f.Close() //nolint:errcheck,gosec
+	defer f.Close() //nolint:errcheck
 
 	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
@@ -111,7 +111,7 @@ func WriteCertificateToFile(fname string, cert *x509.Certificate) error {
 	if err != nil {
 		return errors.Wrap(err, "error opening certificate file")
 	}
-	defer f.Close() //nolint:errcheck,gosec
+	defer f.Close() //nolint:errcheck
 
 	if err := pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); err != nil {
 		return errors.Wrap(err, "Failed to write data")
@@ -142,6 +142,8 @@ func verifyPeerCertificate(sha256Fingerprint string) func(rawCerts [][]byte, ver
 	sha256Fingerprint = strings.ToLower(sha256Fingerprint)
 
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		_ = verifiedChains
+
 		var serverCerts []string
 
 		for _, c := range rawCerts {

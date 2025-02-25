@@ -15,12 +15,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/kopia/kopia/internal/blobtesting"
 	"github.com/kopia/kopia/internal/clock"
 	"github.com/kopia/kopia/internal/gather"
+	"github.com/kopia/kopia/internal/providervalidation"
 	"github.com/kopia/kopia/internal/testlogging"
 	"github.com/kopia/kopia/internal/testutil"
 	"github.com/kopia/kopia/repo/blob"
@@ -88,7 +90,7 @@ func TestRCloneStorage(t *testing.T) {
 
 	// trigger multiple parallel reads to ensure we're properly preventing race
 	// described in https://github.com/kopia/kopia/issues/624
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		eg.Go(func() error {
 			var tmp gather.WriteBuffer
 			defer tmp.Close()
@@ -220,8 +222,6 @@ func TestRCloneProviders(t *testing.T) {
 	rcloneExe := mustGetRcloneExeOrSkip(t)
 
 	for name, rp := range rcloneExternalProviders {
-		rp := rp
-
 		opt := &rclone.Options{
 			RemotePath:     rp,
 			RCloneExe:      rcloneExe,
@@ -235,14 +235,10 @@ func TestRCloneProviders(t *testing.T) {
 		}
 
 		t.Run("Cleanup-"+name, func(t *testing.T) {
-			t.Parallel()
-
 			cleanupOldData(t, rcloneExe, rp)
 		})
 
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
 			ctx := testlogging.Context(t)
 
 			// we are using shared storage, append a guid so that tests don't collide
@@ -258,6 +254,7 @@ func TestRCloneProviders(t *testing.T) {
 				blob.PutOptions{})
 
 			blobtesting.AssertConnectionInfoRoundTrips(ctx, t, st)
+			require.NoError(t, providervalidation.ValidateProvider(ctx, st, blobtesting.TestValidationOptions))
 
 			// write a bunch of tiny blobs massively in parallel
 			// and kill rclone immediately after to ensure all writes are synchronous
@@ -265,15 +262,14 @@ func TestRCloneProviders(t *testing.T) {
 
 			prefix := uuid.NewString()
 
-			for i := 0; i < 10; i++ {
-				i := i
+			for i := range 10 {
 				wg.Add(1)
 
 				go func() {
 					defer wg.Done()
 
-					for j := 0; j < 3; j++ {
-						require.NoError(t, st.PutBlob(ctx, blob.ID(fmt.Sprintf("%v-%v-%v", prefix, i, j)), gather.FromSlice([]byte{1, 2, 3}), blob.PutOptions{}))
+					for j := range 3 {
+						assert.NoError(t, st.PutBlob(ctx, blob.ID(fmt.Sprintf("%v-%v-%v", prefix, i, j)), gather.FromSlice([]byte{1, 2, 3}), blob.PutOptions{}))
 					}
 				}()
 			}
@@ -295,8 +291,8 @@ func TestRCloneProviders(t *testing.T) {
 
 			var eg errgroup.Group
 
-			for i := 0; i < 10; i++ {
-				for j := 0; j < 3; j++ {
+			for i := range 10 {
+				for j := range 3 {
 					blobID := blob.ID(fmt.Sprintf("%v-%v-%v", prefix, i, j))
 
 					eg.Go(func() error {
@@ -328,7 +324,7 @@ func cleanupOldData(t *testing.T, rcloneExe, remotePath string) {
 
 		configFile = filepath.Join(tmpDir, "rclone.conf")
 
-		//nolint:gomnd
+		//nolint:mnd
 		if err = os.WriteFile(configFile, b, 0o600); err != nil {
 			t.Fatalf("unable to write config file: %v", err)
 		}

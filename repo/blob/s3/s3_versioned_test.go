@@ -649,7 +649,8 @@ func randHex(tb testing.TB, length int) string {
 // Notice that this is not a crypto RNG.
 var (
 	rMu sync.Mutex
-	r   = rand.New(rand.NewSource(clock.Now().UnixNano()))
+	// +checklocks:rMu
+	r = rand.New(rand.NewSource(clock.Now().UnixNano()))
 )
 
 func randLongHex(tb testing.TB, length int) string {
@@ -747,7 +748,7 @@ func compareMetadata(tb testing.TB, a, b versionMetadata) {
 	// deletion-marker metadata is not returned by the delete blob operation,
 	// and can only be retrieved later by listing versions.
 	if !a.IsDeleteMarker {
-		require.Equalf(tb, a.Version, b.Version, "blob versions do not match a:%v b:v", a, b)
+		require.Equalf(tb, a.Version, b.Version, "blob versions do not match a:%v b:%v", a, b)
 	}
 }
 

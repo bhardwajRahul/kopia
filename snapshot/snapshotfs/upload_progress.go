@@ -7,10 +7,32 @@ import (
 	"github.com/kopia/kopia/internal/uitask"
 )
 
+const (
+	// EstimationTypeClassic represents old way of estimation, which assumes iterating over all files.
+	EstimationTypeClassic = "classic"
+	// EstimationTypeRough represents new way of estimation, which looks into filesystem stats to get amount of data.
+	EstimationTypeRough = "rough"
+	// EstimationTypeAdaptive is a combination of new and old approaches. If the estimated file count is high,
+	// it will use a rough estimation. If the count is low, it will switch to the classic method.
+	EstimationTypeAdaptive = "adaptive"
+
+	// AdaptiveEstimationThreshold is the point at which the classic estimation is used instead of the rough estimation.
+	AdaptiveEstimationThreshold = 300000
+)
+
+// EstimationParameters represents parameters to be used for estimation.
+type EstimationParameters struct {
+	Type              string
+	AdaptiveThreshold int64
+}
+
 // UploadProgress is invoked by uploader to report status of file and directory uploads.
 //
 //nolint:interfacebloat
 type UploadProgress interface {
+	// Enabled returns true when progress is enabled, false otherwise.
+	Enabled() bool
+
 	// UploadStarted is emitted once at the start of an upload
 	UploadStarted()
 
@@ -53,54 +75,93 @@ type UploadProgress interface {
 	// FinishedDirectory is emitted whenever a directory is finished uploading.
 	FinishedDirectory(dirname string)
 
+	// EstimationParameters returns settings to be used for estimation
+	EstimationParameters() EstimationParameters
+
 	// EstimatedDataSize is emitted whenever the size of upload is estimated.
-	EstimatedDataSize(fileCount int, totalBytes int64)
+	EstimatedDataSize(fileCount int64, totalBytes int64)
 }
 
 // NullUploadProgress is an implementation of UploadProgress that does not produce any output.
 type NullUploadProgress struct{}
 
+// Enabled implements UploadProgress, always returns false.
+func (p *NullUploadProgress) Enabled() bool {
+	return false
+}
+
 // UploadStarted implements UploadProgress.
 func (p *NullUploadProgress) UploadStarted() {}
 
 // EstimatedDataSize implements UploadProgress.
-func (p *NullUploadProgress) EstimatedDataSize(fileCount int, totalBytes int64) {}
+//
+//nolint:revive
+func (p *NullUploadProgress) EstimatedDataSize(fileCount, totalBytes int64) {}
 
 // UploadFinished implements UploadProgress.
 func (p *NullUploadProgress) UploadFinished() {}
 
 // HashedBytes implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) HashedBytes(numBytes int64) {}
 
 // ExcludedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) ExcludedFile(fname string, numBytes int64) {}
 
 // ExcludedDir implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) ExcludedDir(dirname string) {}
 
 // CachedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) CachedFile(fname string, numBytes int64) {}
 
 // UploadedBytes implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) UploadedBytes(numBytes int64) {}
 
 // HashingFile implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) HashingFile(fname string) {}
 
 // FinishedHashingFile implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) FinishedHashingFile(fname string, numBytes int64) {}
 
 // FinishedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) FinishedFile(fname string, err error) {}
 
 // StartedDirectory implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) StartedDirectory(dirname string) {}
 
 // FinishedDirectory implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) FinishedDirectory(dirname string) {}
 
 // Error implements UploadProgress.
+//
+//nolint:revive
 func (p *NullUploadProgress) Error(path string, err error, isIgnored bool) {}
+
+// EstimationParameters implements UploadProgress.
+func (p *NullUploadProgress) EstimationParameters() EstimationParameters {
+	return EstimationParameters{
+		Type: EstimationTypeClassic,
+	}
+}
 
 var _ UploadProgress = (*NullUploadProgress)(nil)
 
@@ -131,7 +192,7 @@ type UploadCounters struct {
 	// +checkatomic
 	IgnoredErrorCount int32 `json:"ignoredErrors"`
 	// +checkatomic
-	EstimatedFiles int32 `json:"estimatedFiles"`
+	EstimatedFiles int64 `json:"estimatedFiles"`
 
 	CurrentDirectory string `json:"directory"`
 
@@ -160,9 +221,9 @@ func (p *CountingUploadProgress) UploadedBytes(numBytes int64) {
 }
 
 // EstimatedDataSize implements UploadProgress.
-func (p *CountingUploadProgress) EstimatedDataSize(numFiles int, numBytes int64) {
+func (p *CountingUploadProgress) EstimatedDataSize(numFiles, numBytes int64) {
 	atomic.StoreInt64(&p.counters.EstimatedBytes, numBytes)
-	atomic.StoreInt32(&p.counters.EstimatedFiles, int32(numFiles))
+	atomic.StoreInt64(&p.counters.EstimatedFiles, numFiles)
 }
 
 // HashedBytes implements UploadProgress.
@@ -171,25 +232,35 @@ func (p *CountingUploadProgress) HashedBytes(numBytes int64) {
 }
 
 // CachedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *CountingUploadProgress) CachedFile(fname string, numBytes int64) {
 	atomic.AddInt32(&p.counters.TotalCachedFiles, 1)
 	atomic.AddInt64(&p.counters.TotalCachedBytes, numBytes)
 }
 
 // FinishedHashingFile implements UploadProgress.
+//
+//nolint:revive
 func (p *CountingUploadProgress) FinishedHashingFile(fname string, numBytes int64) {
 	atomic.AddInt32(&p.counters.TotalHashedFiles, 1)
 }
 
 // FinishedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *CountingUploadProgress) FinishedFile(fname string, err error) {}
 
 // ExcludedDir implements UploadProgress.
+//
+//nolint:revive
 func (p *CountingUploadProgress) ExcludedDir(dirname string) {
 	atomic.AddInt32(&p.counters.TotalExcludedDirs, 1)
 }
 
 // ExcludedFile implements UploadProgress.
+//
+//nolint:revive
 func (p *CountingUploadProgress) ExcludedFile(fname string, numBytes int64) {
 	atomic.AddInt32(&p.counters.TotalExcludedFiles, 1)
 }
@@ -223,15 +294,17 @@ func (p *CountingUploadProgress) Snapshot() UploadCounters {
 	defer p.mu.Unlock()
 
 	return UploadCounters{
-		TotalCachedFiles: atomic.LoadInt32(&p.counters.TotalCachedFiles),
-		TotalHashedFiles: atomic.LoadInt32(&p.counters.TotalHashedFiles),
-		TotalCachedBytes: atomic.LoadInt64(&p.counters.TotalCachedBytes),
-		TotalHashedBytes: atomic.LoadInt64(&p.counters.TotalHashedBytes),
-		EstimatedBytes:   atomic.LoadInt64(&p.counters.EstimatedBytes),
-		EstimatedFiles:   atomic.LoadInt32(&p.counters.EstimatedFiles),
-		CurrentDirectory: p.counters.CurrentDirectory,
-		LastErrorPath:    p.counters.LastErrorPath,
-		LastError:        p.counters.LastError,
+		TotalCachedFiles:  atomic.LoadInt32(&p.counters.TotalCachedFiles),
+		TotalHashedFiles:  atomic.LoadInt32(&p.counters.TotalHashedFiles),
+		TotalCachedBytes:  atomic.LoadInt64(&p.counters.TotalCachedBytes),
+		TotalHashedBytes:  atomic.LoadInt64(&p.counters.TotalHashedBytes),
+		EstimatedBytes:    atomic.LoadInt64(&p.counters.EstimatedBytes),
+		EstimatedFiles:    atomic.LoadInt64(&p.counters.EstimatedFiles),
+		IgnoredErrorCount: atomic.LoadInt32(&p.counters.IgnoredErrorCount),
+		FatalErrorCount:   atomic.LoadInt32(&p.counters.FatalErrorCount),
+		CurrentDirectory:  p.counters.CurrentDirectory,
+		LastErrorPath:     p.counters.LastErrorPath,
+		LastError:         p.counters.LastError,
 	}
 }
 
@@ -258,11 +331,11 @@ func (p *CountingUploadProgress) UITaskCounters(final bool) map[string]uitask.Co
 		"Excluded Files":       uitask.SimpleCounter(int64(atomic.LoadInt32(&p.counters.TotalExcludedFiles))),
 		"Excluded Directories": uitask.SimpleCounter(int64(atomic.LoadInt32(&p.counters.TotalExcludedDirs))),
 
-		"Errors": uitask.ErrorCounter(int64(atomic.LoadInt32(&p.counters.IgnoredErrorCount))),
+		"Errors": uitask.ErrorCounter(int64(atomic.LoadInt32(&p.counters.FatalErrorCount))),
 	}
 
 	if !final {
-		m["Estimated Files"] = uitask.SimpleCounter(int64(atomic.LoadInt32(&p.counters.EstimatedFiles)))
+		m["Estimated Files"] = uitask.SimpleCounter(atomic.LoadInt64(&p.counters.EstimatedFiles))
 		m["Estimated Bytes"] = uitask.BytesCounter(atomic.LoadInt64(&p.counters.EstimatedBytes))
 	}
 
