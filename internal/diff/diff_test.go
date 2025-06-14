@@ -43,7 +43,7 @@ func (f *testBaseEntry) LocalFilesystemPath() string { return f.name }
 func (f *testBaseEntry) Close()                      {}
 func (f *testBaseEntry) Name() string                { return f.name }
 func (f *testBaseEntry) ModTime() time.Time          { return f.modtime }
-func (f *testBaseEntry) Sys() interface{}            { return nil }
+func (f *testBaseEntry) Sys() any                    { return nil }
 func (f *testBaseEntry) Owner() fs.OwnerInfo         { return f.owner }
 func (f *testBaseEntry) Device() fs.DeviceInfo       { return fs.DeviceInfo{Dev: 1} }
 func (f *testBaseEntry) ObjectID() object.ID         { return f.oid }
@@ -504,9 +504,9 @@ func getManifests(t *testing.T) map[string]*snapshot.Manifest {
 
 // Tests GetPrecedingSnapshot function
 //   - GetPrecedingSnapshot with an invalid snapshot id and expect an error;
-//   - Add a snapshot, expect an error from GetPreceedingSnapshot since there is
+//   - Add a snapshot, expect an error from GetPrecedingSnapshot since there is
 //     only a single snapshot in the repo;
-//   - Subsequently add more snapshots and GetPreceedingSnapshot theimmediately
+//   - Subsequently add more snapshots and GetPrecedingSnapshot the immediately
 //     preceding with no error.
 func TestGetPrecedingSnapshot(t *testing.T) {
 	ctx, env := repotesting.NewEnvironment(t, repotesting.FormatNotImportant)
