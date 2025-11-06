@@ -332,11 +332,11 @@ func notDeletingOrphanedPacks(ctx context.Context, log *contentlog.Logger, s *Sc
 
 func runTaskCleanupLogs(ctx context.Context, runParams RunParameters, s *Schedule) error {
 	return ReportRun(ctx, runParams.rep, TaskCleanupLogs, s, func() (maintenancestats.Kind, error) {
-		deleted, err := CleanupLogs(ctx, runParams.rep, runParams.Params.LogRetention.OrDefault())
+		stats, err := CleanupLogs(ctx, runParams.rep, runParams.Params.LogRetention.OrDefault())
 
-		userLog(ctx).Infof("Cleaned up %v logs.", len(deleted))
+		userLog(ctx).Infof("Cleaned up %v logs.", stats.DeletedBlobCount)
 
-		return nil, err
+		return stats, err
 	})
 }
 
@@ -488,7 +488,7 @@ func runTaskDeleteOrphanedPacksQuick(ctx context.Context, runParams RunParameter
 
 func runTaskExtendBlobRetentionTimeFull(ctx context.Context, runParams RunParameters, s *Schedule) error {
 	return ReportRun(ctx, runParams.rep, TaskExtendBlobRetentionTimeFull, s, func() (maintenancestats.Kind, error) {
-		return ExtendBlobRetentionTime(ctx, runParams.rep, ExtendBlobRetentionTimeOptions{})
+		return extendBlobRetentionTime(ctx, runParams.rep, ExtendBlobRetentionTimeOptions{})
 	})
 }
 
